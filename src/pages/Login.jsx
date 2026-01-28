@@ -1,12 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
-import { saveToken, getUserFromToken } from "../services/auth";
+import { saveToken, getUserFromToken, logout } from "../services/auth";
 
 function Login() {
   const [formData, setFormData] = useState({
     username: "",
     password: ""
   });
+
+  const [errorMessage, setErrorMessage] = useState("");
+
+  // 🔁 Clear old session when user comes back to login page
+  useEffect(() => {
+    logout(); // removes token from localStorage
+    setFormData({ username: "", password: "" });
+    setErrorMessage("");
+  }, []);
 
   const handleChange = (e) => {
     setFormData({
@@ -17,22 +26,17 @@ function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorMessage(""); // clear previous error
 
     try {
-        const host = window.location.hostname; // vtec.localhost
+      const host = window.location.hostname; // vtec.localhost
+      const url = `http://${host}:8000/api/login/`;
 
-        const url = `http://${host}:8000/api/login/`;
+      const response = await axios.post(url, formData);
 
-        console.log("Calling URL:", url); // debug
+      const token = response.data.access_token;
 
-        const response = await axios.post(url, formData);
-        console.log("Full response:", response.data);
-
-
-
-        const token = response.data.access_token;
-
-    saveToken(token);
+      saveToken(token);
 
       const user = getUserFromToken();
 
@@ -43,31 +47,59 @@ function Login() {
       }
 
     } catch (error) {
-      console.error(error);
-      alert("Login failed");
+      if (error.response) {
+        if (error.response.status === 401) {
+          setErrorMessage(
+            error.response.data.error ||
+            "Invalid username or password."
+          );
+
+          setFormData({
+            username: "",
+            password: ""
+          });
+        } else {
+          setErrorMessage("Something went wrong. Please try again.");
+        }
+      } else {
+        setErrorMessage("Server not reachable.");
+      }
     }
   };
 
   return (
-    <div>
+    <div style={{ width: "300px", margin: "100px auto" }}>
       <h2>Login</h2>
 
       <form onSubmit={handleSubmit}>
         <input
           name="username"
           placeholder="Username"
+          value={formData.username}
           onChange={handleChange}
         />
+
+        <br /><br />
 
         <input
           type="password"
           name="password"
           placeholder="Password"
+          value={formData.password}
           onChange={handleChange}
         />
 
+        <br /><br />
+
         <button type="submit">Login</button>
       </form>
+
+      {/* 🔴 Error message in red */}
+      {errorMessage && (
+        <p style={{ color: "red", marginTop: "10px" }}>
+          {errorMessage}
+        </p>
+      )}
     </div>
   );
 }
