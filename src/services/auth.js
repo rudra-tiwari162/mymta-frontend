@@ -1,11 +1,16 @@
 import { jwtDecode } from "jwt-decode";
 
+const tenant = window.location.hostname.split(".")[0];
+
+
+
+
 export const saveToken = (token) => {
-  localStorage.setItem("access_token", token);
+  localStorage.setItem("access_token_${tenant}", token);
 };
 
 export const getUserFromToken = () => {
-  const token = localStorage.getItem("access_token");
+  const token = localStorage.getItem("access_token_${tenant}");
   if (!token) {
     return null;
   }
@@ -18,6 +23,6 @@ export const getUserFromToken = () => {
 };
 
 export const logout = () => {
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("id_token"); // Also remove id_token for cleanup
+  localStorage.removeItem("access_token_${tenant}");
+  localStorage.removeItem("id_token_${tenant}"); // Also remove id_token for cleanup
 };

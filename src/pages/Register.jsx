@@ -20,7 +20,7 @@ function Register() {
 
     try {
       await axios.post("http://localhost:8000/api/register/", formData);
-      window.location.href = `http://${formData.subdomain}.localhost:3000/login`;
+      window.location.href = `http://${formData.subdomain}.localhost:5173/login`;
     } catch (error) {
       console.error(error);
       alert("Registration failed");

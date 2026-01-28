@@ -12,21 +12,17 @@ function AdminDashboard() {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  // 🔐 Protect route: only admin allowed
   useEffect(() => {
     const user = getUserFromToken();
+    const userRoles = user?.["https://mymta.com/roles"] || [];
 
-    // The roles are in a custom claim, not in user.role
-    const userRoles = user?.['https://mymta.com/roles'] || [];
-
-    if (!user || !userRoles.includes('ADMIN')) {
+    if (!user || !userRoles.includes("ADMIN")) {
       logout();
-      window.location.href = '/login';
+      window.location.href = "/login";
     } else {
       fetchUsers();
     }
   }, []);
-
 
   const fetchUsers = async () => {
     try {
@@ -75,14 +71,12 @@ function AdminDashboard() {
   };
 
   return (
-    <div style={{ width: "600px", margin: "50px auto" }}>
+    <div style={{ width: "700px", margin: "50px auto" }}>
       <h2>Admin Dashboard</h2>
 
-      {/* Messages */}
       {errorMessage && <p style={{ color: "red" }}>{errorMessage}</p>}
       {successMessage && <p style={{ color: "green" }}>{successMessage}</p>}
 
-      {/* Create User */}
       <h3>Create Employee</h3>
       <form onSubmit={createUser}>
         <input
@@ -105,21 +99,22 @@ function AdminDashboard() {
 
       <hr />
 
-      {/* User List */}
       <h3>Users</h3>
       <table border="1" width="100%" cellPadding="8">
         <thead>
           <tr>
-            <th>ID</th>
+            <th>S.No</th>
             <th>Username</th>
+            <th>Email</th>
             <th>Action</th>
           </tr>
         </thead>
         <tbody>
-          {users.map((u) => (
-            <tr key={u.id}>
-              <td>{u.id}</td>
+          {users.map((u, index) => (
+            <tr key={u.email || u.username}>
+              <td>{index + 1}</td>
               <td>{u.username}</td>
+              <td>{u.email}</td>
               <td>
                 <button onClick={() => deleteUser(u.id)}>Delete</button>
               </td>
@@ -130,10 +125,12 @@ function AdminDashboard() {
 
       <br />
 
-      <button onClick={() => {
-        logout();
-        window.location.href = "/login";
-      }}>
+      <button
+        onClick={() => {
+          logout();
+          window.location.href = "/login";
+        }}
+      >
         Logout
       </button>
     </div>
