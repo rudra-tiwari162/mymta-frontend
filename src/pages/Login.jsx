@@ -19,13 +19,20 @@ function Login() {
     e.preventDefault();
 
     try {
-      const response = await axios.post(
-        "http://localhost:8000/auth/login/",
-        formData
-      );
+        const host = window.location.hostname; // vtec.localhost
 
-      const token = response.data.access;
-      saveToken(token);
+        const url = `http://${host}:8000/api/login/`;
+
+        console.log("Calling URL:", url); // debug
+
+        const response = await axios.post(url, formData);
+        console.log("Full response:", response.data);
+
+
+
+        const token = response.data.access_token;
+
+    saveToken(token);
 
       const user = getUserFromToken();
 
