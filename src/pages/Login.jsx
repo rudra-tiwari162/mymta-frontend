@@ -12,7 +12,6 @@ function Login() {
 
   // 🔁 Clear old session when user comes back to login page
   useEffect(() => {
-    logout(); // removes token from localStorage
     setFormData({ username: "", password: "" });
     setErrorMessage("");
   }, []);
@@ -40,7 +39,9 @@ function Login() {
 
       const user = getUserFromToken();
 
-      if (user.role === "admin") {
+      const userRoles = user?.['https://mymta.com/roles'] || [];
+
+      if (userRoles.includes('ADMIN')) {
         window.location.href = "/admin";
       } else {
         window.location.href = "/profile";
