@@ -29,7 +29,7 @@ function Login() {
 
     try {
       const host = window.location.hostname; // vtec.localhost
-      const url = `http://${host}:8000/api/login/`;
+      const url = `http://${host}:8001/api/login/`;
 
       const response = await axios.post(url, formData);
 

@@ -4,7 +4,7 @@ const tenant = window.location.hostname.split(".")[0];
 
 
 const api = axios.create({
-  baseURL: `http://${window.location.hostname}:8000`
+  baseURL: `http://${window.location.hostname}:8001`
 });
 
 api.interceptors.request.use((config) => {

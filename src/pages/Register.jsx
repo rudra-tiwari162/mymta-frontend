@@ -19,7 +19,7 @@ function Register() {
     e.preventDefault();
 
     try {
-      await axios.post("http://localhost:8000/api/register/", formData);
+      await axios.post("http://localhost:8001/api/register/", formData);
       window.location.href = `http://${formData.subdomain}.localhost:5173/login`;
     } catch (error) {
       console.error(error);
