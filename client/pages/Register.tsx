@@ -152,7 +152,8 @@ export default function Register() {
       // Redirect to the tenant's subdomain login page
       setTimeout(() => {
         const port = window.location.port ? `:${window.location.port}` : "";
-        const loginUrl = `http://${formData.subdomain.toLowerCase().trim()}.localhost${port}/login`;
+        const tenant = data.tenant ?? data.subdomain ?? formData.subdomain.toLowerCase().trim();
+        const loginUrl = `http://${tenant}.localhost${port}/login`;
         console.log("🔄 Redirecting to tenant login:", loginUrl);
         window.location.href = loginUrl;
       }, 1500);

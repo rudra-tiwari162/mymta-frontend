@@ -13,6 +13,7 @@ import {
   Loader,
   AlertCircle
 } from "lucide-react";
+import { apiCall } from "@/lib/api";
 import { toast } from "sonner";
 
 export default function UsersPage() {
@@ -39,12 +40,7 @@ export default function UsersPage() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("access_token");
-      const response = await fetch("/api/v1/users/", {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
+      const response = await apiCall("/api/v1/users/");
       
       if (!response.ok) {
         let errorMessage = "Failed to fetch users";
@@ -72,13 +68,8 @@ export default function UsersPage() {
     setCreating(true);
     
     try {
-      const token = localStorage.getItem("access_token");
-      const response = await fetch("/api/v1/users/", {
+      const response = await apiCall("/api/v1/users/", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
         body: JSON.stringify(newUser)
       });
       

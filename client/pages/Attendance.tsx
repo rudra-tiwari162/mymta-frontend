@@ -3,8 +3,9 @@ import AppLayout from "@/components/app-layout";
 import DashboardCard from "@/components/dashboard-card";
 import { Calendar, Users, CheckCircle2, AlertCircle, Clock, Loader } from "lucide-react";
 import { toast } from "sonner";
+import { apiCall } from "@/lib/api";
 
-type AttendanceStatus = "present" | "wfh" | "leave" | "absent";
+type AttendanceStatus = "present" | "wfh" | "leave" | "absent" | "half_day";
 
 interface AttendanceRecord {
   id?: string;
@@ -23,6 +24,7 @@ export default function Attendance() {
   const [loading, setLoading] = useState(true);
   const [clocking, setClocking] = useState(false);
   const [isClockedIn, setIsClockedIn] = useState(false);
+  const [hasTodayRecord, setHasTodayRecord] = useState(false);
 
   useEffect(() => {
     fetchAttendance();
@@ -32,26 +34,25 @@ export default function Attendance() {
     setLoading(true);
     try {
       const token = localStorage.getItem("access_token");
-      const response = await fetch("/api/operations/attendance/", {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      const response = await apiCall("/api/operations/attendance/");
       if (!response.ok) throw new Error("Failed to fetch attendance");
       const data = await response.json();
       
       const mapped = Array.isArray(data) ? data.map((item: any) => ({
         id: item.id,
-        date: item.clock_in ? item.clock_in.split("T")[0] : "",
-        status: "present" as AttendanceStatus,
+        date: item.date ?? (item.clock_in ? item.clock_in.split("T")[0] : ""),
+        status: (item.status as AttendanceStatus) || (item.clock_in ? "present" : "absent"),
         clock_in: item.clock_in,
         clock_out: item.clock_out,
-        sodSubmitted: false,
-        eodSubmitted: false,
+        sodSubmitted: item.sod_submitted ?? item.sodSubmitted ?? false,
+        eodSubmitted: item.eod_submitted ?? item.eodSubmitted ?? false,
       })) : [];
       setRecords(mapped);
       
       const today = new Date().toISOString().split("T")[0];
       const todayRecord = mapped.find((r: any) => r.date === today && !r.clock_out);
       setIsClockedIn(!!todayRecord);
+      setHasTodayRecord(mapped.some((r: any) => r.date === today));
     } catch (err) {
       toast.error("Could not load attendance data");
     } finally {
@@ -59,17 +60,55 @@ export default function Attendance() {
     }
   };
 
+  const handleMarkLeave = async () => {
+    setClocking(true);
+    try {
+      const response = await apiCall("/api/operations/attendance/", {
+        method: "POST",
+        body: JSON.stringify({ status: "leave" })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || errorData.error || "Failed to mark leave");
+      }
+      
+      toast.success("Leave marked successfully");
+      fetchAttendance();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Operation failed");
+    } finally {
+      setClocking(false);
+    }
+  };
+
   const handleClockAction = async () => {
     setClocking(true);
     try {
       const token = localStorage.getItem("access_token");
-      const response = await fetch("/api/operations/attendance/", {
-        method: "POST",
-        headers: { 
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
+      let response;
+      
+      if (isClockedIn) {
+        response = await apiCall("/api/operations/attendance/clock-out/", {
+          method: "POST",
+          body: JSON.stringify({})
+        });
+        
+        if (response.status === 404 || response.status === 405) {
+          const today = new Date().toISOString().split("T")[0];
+          const todayRecord = records.find(r => r.date === today && !r.clock_out);
+          if (todayRecord && todayRecord.id) {
+            response = await apiCall(`/api/operations/attendance/${todayRecord.id}/clock-out/`, {
+              method: "POST",
+              body: JSON.stringify({})
+            });
+          }
         }
-      });
+      } else {
+        response = await apiCall("/api/operations/attendance/", {
+          method: "POST",
+        });
+      }
       
       if (!response.ok) throw new Error("Action failed");
       
@@ -128,6 +167,8 @@ export default function Attendance() {
         return "bg-red-100 border-red-300 text-red-700";
       case "absent":
         return "bg-gray-100 border-gray-300 text-gray-700";
+      case "half_day":
+        return "bg-orange-100 border-orange-300 text-orange-700";
     }
   };
 
@@ -141,6 +182,8 @@ export default function Attendance() {
         return "Leave";
       case "absent":
         return "Absent";
+      case "half_day":
+        return "Half Day";
     }
   };
 
@@ -161,16 +204,28 @@ export default function Attendance() {
             <h1 className="text-3xl font-bold text-gray-900">Attendance</h1>
             <p className="text-gray-600 mt-2">Track your attendance and work patterns</p>
           </div>
-          <button
-            onClick={handleClockAction}
-            disabled={clocking}
-            className={`flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-bold text-white transition-all shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50 ${
-              isClockedIn ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"
-            }`}
-          >
-            {clocking ? <Loader className="animate-spin" size={20} /> : <Clock size={20} />}
-            {isClockedIn ? "Clock Out" : "Clock In"}
-          </button>
+          <div className="flex gap-3">
+            {!hasTodayRecord && (
+              <button
+                onClick={handleMarkLeave}
+                disabled={clocking}
+                className="flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-bold bg-orange-50 text-orange-700 border border-orange-200 transition-all hover:bg-orange-100 active:scale-95 disabled:opacity-50"
+              >
+                {clocking ? <Loader className="animate-spin" size={20} /> : <AlertCircle size={20} />}
+                Mark Leave
+              </button>
+            )}
+            <button
+              onClick={handleClockAction}
+              disabled={clocking}
+              className={`flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-bold text-white transition-all shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50 ${
+                isClockedIn ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"
+              }`}
+            >
+              {clocking ? <Loader className="animate-spin" size={20} /> : <Clock size={20} />}
+              {isClockedIn ? "Clock Out" : "Clock In"}
+            </button>
+          </div>
         </div>
 
         {/* Statistics Cards */}
@@ -246,15 +301,17 @@ export default function Attendance() {
           {/* Calendar Grid */}
           <div className="grid grid-cols-7 gap-2">
             {getDaysInCurrentMonth().map((day) => {
+              const localDateString = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
               const record = attendanceData.find(
-                (r) => r.date === day.toISOString().split("T")[0]
+                (r) => r.date === localDateString
               );
 
               const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+              const isTodayOrPast = day.getTime() <= new Date().setHours(0,0,0,0);
 
               return (
                 <div
-                  key={day.toISOString()}
+                  key={localDateString}
                   className={`p-2 rounded-lg text-center text-sm h-24 flex flex-col items-center justify-center border-2 ${
                     isWeekend
                       ? "bg-gray-50 border-gray-200"
@@ -267,8 +324,16 @@ export default function Attendance() {
                   <span className="font-bold text-base">{day.getDate()}</span>
                   {record && (
                     <div className="mt-1 text-xs flex gap-0.5">
-                      {record.sodSubmitted && <span className="bg-green-600 text-white px-1 rounded">SOD</span>}
-                      {record.eodSubmitted && <span className="bg-green-600 text-white px-1 rounded">EOD</span>}
+                      {record.sodSubmitted ? (
+                        <span className="bg-green-600 text-white px-1 rounded">SOD ✓</span>
+                      ) : (isTodayOrPast && !isWeekend) ? (
+                        <span className="bg-orange-400 text-white px-1 rounded opacity-80" title="Missing SOD">SOD ✕</span>
+                      ) : null}
+                      {record.eodSubmitted ? (
+                        <span className="bg-green-600 text-white px-1 rounded">EOD ✓</span>
+                      ) : (isTodayOrPast && !isWeekend) ? (
+                        <span className="bg-orange-400 text-white px-1 rounded opacity-80" title="Missing EOD">EOD ✕</span>
+                      ) : null}
                     </div>
                   )}
                 </div>

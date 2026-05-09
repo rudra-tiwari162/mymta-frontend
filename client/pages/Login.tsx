@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertCircle, Loader, Eye, EyeOff } from "lucide-react";
+import { getRoleFromToken, getTenantFromToken } from "@/lib/jwt";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -81,14 +82,36 @@ export default function Login() {
       localStorage.setItem("access_token", data.access_token);
       localStorage.setItem("token_type", data.token_type || "Bearer");
 
-      // Redirect to dashboard
-      setTimeout(() => {
-        if (window.location.hostname === "localhost") {
-          const port = window.location.port ? `:${window.location.port}` : "";
-          window.location.href = `http://${subdomain}.localhost${port}/`;
-        } else {
-          navigate("/");
+      const role = getRoleFromToken(data.access_token);
+      let tenant = getTenantFromToken(data.access_token);
+
+      if (!tenant) {
+        const hostname = window.location.hostname;
+        const parts = hostname.split(".");
+        if (parts.length >= 2 && parts[parts.length - 1] === "localhost") {
+          tenant = parts[0];
         }
+      }
+
+      if (role) {
+        localStorage.setItem("user_role", role);
+        console.log("✅ Role stored:", role);
+      }
+      if (tenant) {
+        localStorage.setItem("tenant", tenant);
+        console.log("✅ Tenant stored:", tenant);
+      }
+
+      // Redirect to the correct tenant host after login
+      setTimeout(() => {
+        const targetTenant = tenant || subdomain || "localhost";
+        const port = window.location.port ? `:${window.location.port}` : "";
+        const targetHost =
+          targetTenant === "localhost"
+            ? `localhost${port}`
+            : `${targetTenant}.localhost${port}`;
+
+        window.location.href = `${window.location.protocol}//${targetHost}/`;
       }, 500);
     } catch (err) {
       setError("An error occurred. Please try again.");

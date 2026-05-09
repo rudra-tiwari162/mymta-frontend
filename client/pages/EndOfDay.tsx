@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import AppLayout from "@/components/app-layout";
 import { CheckCircle2, AlertCircle, Save, Clock, Loader } from "lucide-react";
 import { toast } from "sonner";
+import { apiCall } from "@/lib/api";
 
 interface PlannedTask {
   id: string;
@@ -22,6 +23,7 @@ export default function EndOfDay() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
   const [logId, setLogId] = useState<string | null>(null);
+  const [eodSubmitted, setEodSubmitted] = useState(false);
 
   useEffect(() => {
     fetchTodaySOD();
@@ -31,19 +33,31 @@ export default function EndOfDay() {
     setLoading(true);
     try {
       const token = localStorage.getItem("access_token");
-      const response = await fetch("/api/operations/daily-logs/", {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      const response = await apiCall("/api/operations/daily-logs/");
       const logs = await response.json();
       const todayLog = logs.find((l: any) => l.date === today);
       
       if (todayLog) {
         setLogId(todayLog.id);
+        if (todayLog.eod_content) setEodSubmitted(true);
         if (todayLog.sod_content) {
           try {
-            const sodData = JSON.parse(todayLog.sod_content);
-            if (sodData.tasks) {
-              setPlannedTasks(sodData.tasks.map((t: any) => ({ ...t, completed: false })));
+            if (todayLog.sod_content.trim().startsWith('{') || todayLog.sod_content.trim().startsWith('[')) {
+              const sodData = JSON.parse(todayLog.sod_content);
+              if (sodData.tasks) {
+                setPlannedTasks(sodData.tasks.map((t: any) => ({ ...t, completed: false })));
+              }
+            } else {
+              const tasksMatch = todayLog.sod_content.match(/Tasks:\n([\s\S]*)/);
+              if (tasksMatch) {
+                const taskLines = tasksMatch[1].split('\n').filter((l: string) => l.trim().startsWith('-'));
+                const parsedTasks = taskLines.map((line: string, i: number) => {
+                  const titleMatch = line.match(/- (.+?) \[\w+,/);
+                  const title = titleMatch ? titleMatch[1].trim() : line.replace('- ', '').trim();
+                  return { id: i.toString(), title, priority: "Medium" as const, estimatedTime: 60, completed: false };
+                });
+                setPlannedTasks(parsedTasks);
+              }
             }
           } catch (e) {
             console.error("Failed to parse SOD content", e);
@@ -80,31 +94,42 @@ export default function EndOfDay() {
       const eodData = {
         completedTasks: plannedTasks.filter((t) => t.completed).map((t) => t.title),
         pendingTasks: plannedTasks.filter((t) => !t.completed).map((t) => t.title),
-        blockers,
-        notes,
       };
+
+      const eodContentStr = [
+        eodData.completedTasks.length > 0 ? `Completed:\n${eodData.completedTasks.map(t => `- ${t}`).join('\n')}` : '',
+        notes ? `Notes:\n${notes}` : ''
+      ].filter(Boolean).join('\n\n');
 
       if (!logId) {
         throw new Error("No SOD record found for today. Please submit SOD first.");
       }
 
-      const response = await fetch(`/api/operations/daily-logs/${logId}/`, {
-        method: "PATCH",
-        headers: { 
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ eod_content: JSON.stringify(eodData) })
-      });
+      const response = eodSubmitted 
+        ? await apiCall(`/api/operations/daily-logs/${logId}/`, {
+            method: "PATCH",
+            body: JSON.stringify({ eod_content: eodContentStr })
+          })
+        : await apiCall(`/api/operations/daily-logs/submit-eod/`, {
+            method: "POST",
+            body: JSON.stringify({ 
+              eod_content: eodContentStr,
+              blockers: blockers,
+              pending: eodData.pendingTasks.join(', ')
+            })
+          });
 
       if (!response.ok) throw new Error("Failed to save EOD");
 
       setSuccess(true);
+      toast.success("End of Day logged successfully!");
       setTimeout(() => {
         setSuccess(false);
       }, 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save EOD. Please try again.");
+      const msg = err instanceof Error ? err.message : "Failed to save EOD. Please try again.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }

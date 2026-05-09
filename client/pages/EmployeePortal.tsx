@@ -11,6 +11,7 @@ import {
   AlertCircle,
   Loader
 } from "lucide-react";
+import { apiCall, fetchPortalPosts } from "@/lib/api";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { User, PortalPost } from "@shared/api";
@@ -37,33 +38,24 @@ export default function EmployeePortal() {
       }
 
       // Fetch Profile
-      const meRes = await fetch("/api/v1/users/me/", {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      const meRes = await apiCall("/api/v1/users/me/");
       const meData = await meRes.json();
       setUser(meData);
 
       // Fetch Attendance Status
-      const attRes = await fetch("/api/operations/attendance/", {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      const attRes = await apiCall("/api/operations/attendance/");
       const attData = await attRes.json();
       const today = new Date().toISOString().split("T")[0];
       const todayAtt = attData.find((a: any) => a.date === today && !a.clock_out);
       setClockedIn(!!todayAtt);
 
       // Fetch Daily Logs
-      const logRes = await fetch("/api/operations/daily-logs/", {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      const logRes = await apiCall("/api/operations/daily-logs/");
       const logData = await logRes.json();
       setTodayLog(logData.find((l: any) => l.date === today));
 
       // Fetch Portal Posts (Updates)
-      const postRes = await fetch("/api/operations/portal-posts/", {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      const postData = await postRes.json();
+      const postData = await fetchPortalPosts();
       setPosts(postData.slice(0, 5)); // Latest 5
 
     } catch (err) {

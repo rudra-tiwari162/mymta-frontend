@@ -4,6 +4,7 @@ import DashboardCard from "@/components/dashboard-card";
 import { CheckCircle2, Clock, AlertCircle, FileText, Loader } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { apiCall } from "@/lib/api";
 
 interface DailyLog {
   id: string;
@@ -27,10 +28,7 @@ export default function DailyLogs() {
   const fetchLogs = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("access_token");
-      const response = await fetch("/api/operations/daily-logs/", {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      const response = await apiCall("/api/operations/daily-logs/");
       if (!response.ok) throw new Error("Failed to fetch logs");
       const data = await response.json();
       
@@ -41,12 +39,26 @@ export default function DailyLogs() {
         
         try {
           if (log.sod_content) {
-            const sod = JSON.parse(log.sod_content);
-            tasksPlanned = sod.tasks?.length || 0;
+            if (log.sod_content.trim().startsWith('{') || log.sod_content.trim().startsWith('[')) {
+              const sod = JSON.parse(log.sod_content);
+              tasksPlanned = sod.tasks?.length || 0;
+            } else {
+              const tasksMatch = log.sod_content.match(/Tasks:\n([\s\S]*)/);
+              if (tasksMatch) {
+                tasksPlanned = tasksMatch[1].split('\n').filter((l: string) => l.trim().startsWith('-')).length;
+              }
+            }
           }
           if (log.eod_content) {
-            const eod = JSON.parse(log.eod_content);
-            tasksCompleted = eod.completedTasks?.length || 0;
+            if (log.eod_content.trim().startsWith('{') || log.eod_content.trim().startsWith('[')) {
+              const eod = JSON.parse(log.eod_content);
+              tasksCompleted = eod.completedTasks?.length || 0;
+            } else {
+              const completedMatch = log.eod_content.match(/Completed:\n([\s\S]*?)(?:\n\n|$)/);
+              if (completedMatch) {
+                tasksCompleted = completedMatch[1].split('\n').filter((l: string) => l.trim().startsWith('-')).length;
+              }
+            }
           }
         } catch (e) {}
 

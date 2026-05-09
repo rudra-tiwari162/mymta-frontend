@@ -40,8 +40,7 @@ export default function Placeholder({ title, description }: PlaceholderProps) {
           <p className="text-gray-600 mb-8 max-w-md mx-auto">{description}</p>
 
           <p className="text-sm text-gray-500">
-            Continue asking in the chat to build out this page with real
-            features.
+            This page is under progress.
           </p>
         </div>
       </div>
