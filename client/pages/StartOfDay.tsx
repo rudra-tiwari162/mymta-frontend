@@ -1,6 +1,8 @@
 import { useState } from "react";
 import AppLayout from "@/components/app-layout";
 import { Plus, Trash2, Save, AlertCircle } from "lucide-react";
+import { apiCall } from "@/lib/api";
+import { toast } from "sonner";
 
 interface Task {
   id: string;
@@ -68,35 +70,26 @@ export default function StartOfDay() {
       const token = localStorage.getItem("access_token");
       
       // 1. Check if a record for today already exists
-      const listResponse = await fetch("/api/operations/daily-logs/", {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      const listResponse = await apiCall("/api/operations/daily-logs/");
       const logs = await listResponse.json();
       const todayLog = logs.find((l: any) => l.date === today);
 
-      const payload = {
-        sod_content: JSON.stringify({ goals, focusArea, tasks }),
-        eod_content: todayLog?.eod_content || ""
-      };
+      const sodContentStr = [
+        `Goals: ${goals}`,
+        focusArea ? `Focus: ${focusArea}` : '',
+        `Tasks:\n${tasks.map(t => `- ${t.title} [${t.priority}, ${t.estimatedTime}m]`).join('\n')}`
+      ].filter(Boolean).join('\n\n');
 
       let response;
       if (todayLog) {
-        response = await fetch(`/api/operations/daily-logs/${todayLog.id}/`, {
+        response = await apiCall(`/api/operations/daily-logs/${todayLog.id}/`, {
           method: "PATCH",
-          headers: { 
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ sod_content: payload.sod_content })
+          body: JSON.stringify({ sod_content: sodContentStr })
         });
       } else {
-        response = await fetch("/api/operations/daily-logs/", {
+        response = await apiCall("/api/operations/daily-logs/submit-sod/", {
           method: "POST",
-          headers: { 
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(payload)
+          body: JSON.stringify({ sod_content: sodContentStr })
         });
       }
 
@@ -106,11 +99,14 @@ export default function StartOfDay() {
       }
 
       setSuccess(true);
+      toast.success("Start of Day logged successfully!");
       setTimeout(() => {
         setSuccess(false);
       }, 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save SOD. Please try again.");
+      const msg = err instanceof Error ? err.message : "Failed to save SOD. Please try again.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

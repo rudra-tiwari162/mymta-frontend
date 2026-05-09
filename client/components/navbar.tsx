@@ -1,18 +1,44 @@
 import { Search, Bell, Plus, Menu, X, LogOut } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+import { decodeJWT } from "@/lib/jwt";
 
 export default function Navbar() {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Extract user data from JWT token
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
+
+    const payload = decodeJWT(token);
+    if (payload) {
+      setUserEmail(payload.email || null);
+      setUserName(payload.name || payload.nickname || null);
+      
+      // Get stored role
+      const role = localStorage.getItem("user_role");
+      if (role) {
+        setUserRole(role);
+      }
+    }
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("access_token");
     localStorage.removeItem("token_type");
+    localStorage.removeItem("user_role");
+    localStorage.removeItem("tenant");
     navigate("/login");
   };
+
+  const userInitial = userEmail?.charAt(0).toUpperCase() || "U";
 
   return (
     <>
@@ -71,13 +97,18 @@ export default function Navbar() {
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
                 className="w-8 h-8 bg-green-600 rounded-full text-white text-sm font-medium hover:bg-green-700 transition-colors flex items-center justify-center"
               >
-                U
+                {userInitial}
               </button>
               {showProfileMenu && (
                 <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
                   <div className="p-3 border-b border-gray-200">
-                    <p className="text-sm font-medium text-gray-900">Admin User</p>
-                    <p className="text-xs text-gray-500">admin@company.com</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {userName || "User"}
+                    </p>
+                    <p className="text-xs text-gray-500">{userEmail}</p>
+                    <p className="text-xs text-green-600 font-medium mt-1 capitalize">
+                      {userRole} Account
+                    </p>
                   </div>
                   <button
                     onClick={handleLogout}

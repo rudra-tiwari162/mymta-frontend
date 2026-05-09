@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { apiCall } from "@/lib/api";
 
 const adminItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/" },
@@ -39,15 +40,13 @@ export default function Sidebar() {
     const token = localStorage.getItem("access_token");
     if (!token) return;
 
-    fetch("/api/v1/users/me/", {
-      headers: { "Authorization": `Bearer ${token}` }
-    })
-    .then(res => res.json())
-    .then(data => {
-      setUser(data);
-      setRole(data.role);
-    })
-    .catch(() => {});
+    apiCall("/api/v1/users/me/")
+      .then((res) => res.json())
+      .then((data) => {
+        setUser(data);
+        setRole(data.role);
+      })
+      .catch(() => {});
   }, []);
 
   const currentNavItems = role === "admin" ? adminItems : employeeItems;

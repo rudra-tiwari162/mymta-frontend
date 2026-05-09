@@ -18,7 +18,10 @@ import DailyLogs from "./pages/DailyLogs";
 import StartOfDay from "./pages/StartOfDay";
 import EndOfDay from "./pages/EndOfDay";
 import EmployeePortal from "./pages/EmployeePortal";
+import Tasks from "./pages/Tasks";
+import Projects from "./pages/Projects";
 import { useState, useEffect } from "react";
+import { getRoleFromToken } from "@/lib/jwt";
 
 const queryClient = new QueryClient();
 
@@ -33,23 +36,47 @@ const Home = () => {
       return;
     }
 
-    fetch("/api/v1/users/me/", {
-      headers: { "Authorization": `Bearer ${token}` }
-    })
-    .then(res => res.json())
-    .then(data => setRole(data.role))
-    .catch(() => {})
-    .finally(() => setLoading(false));
+    // First, try to get stored role
+    let storedRole = localStorage.getItem("user_role");
+
+    if (storedRole) {
+      console.log("✅ Using stored role:", storedRole);
+      setRole(storedRole);
+      setLoading(false);
+      return;
+    }
+
+    // If not stored, extract from JWT token
+    const extractedRole = getRoleFromToken(token);
+    if (extractedRole) {
+      console.log("✅ Extracted role from token:", extractedRole);
+      localStorage.setItem("user_role", extractedRole);
+      setRole(extractedRole);
+    } else {
+      console.warn("⚠️ Could not determine user role");
+    }
+
+    setLoading(false);
   }, []);
 
   if (loading) return null;
 
   if (window.location.hostname === "localhost") return <Register />;
-  
+
   const token = localStorage.getItem("access_token");
   if (!token) return <Login />;
 
-  return role === "admin" ? <Index /> : <EmployeePortal />;
+  // Route based on role
+  if (role === "admin") {
+    console.log("🔑 Routing to Admin Dashboard");
+    return <Index />;
+  } else if (role === "employee") {
+    console.log("👤 Routing to Employee Portal");
+    return <EmployeePortal />;
+  } else {
+    console.warn("❌ Unknown role, redirecting to login");
+    return <Login />;
+  }
 };
 
 const App = () => (
@@ -72,21 +99,11 @@ const App = () => (
           {/* Protected/Dashboard routes */}
           <Route
             path="/projects"
-            element={
-              <Placeholder
-                title="Projects"
-                description="Manage all your projects in one place. Continue prompting to build out this page."
-              />
-            }
+            element={<Projects />}
           />
           <Route
             path="/tasks"
-            element={
-              <Placeholder
-                title="Tasks"
-                description="View and manage all tasks across your projects. Continue prompting to build out this page."
-              />
-            }
+            element={<Tasks />}
           />
           <Route
             path="/activity"
@@ -102,7 +119,7 @@ const App = () => (
             element={
               <Placeholder
                 title="Settings"
-                description="Customize your workspace preferences. Continue prompting to build out this page."
+                description="Page Under Progress"
               />
             }
           />
